@@ -36,7 +36,7 @@ func (uc Controller) SignIn(c *web.Context) error {
 
 	if detail.Password == nil {
 		return c.RespondError(&web.Error{
-			Err:    errors.New("area not found"),
+			Err:    errors.New("user not found"),
 			Status: http.StatusNotFound,
 		})
 	}

@@ -78,17 +78,3 @@ type UpdateRequest struct {
 	AvatarLink *string               `json:"-" form:"-"`
 	Role       *string               `json:"role" form:"role"`
 }
-
-type UploadAvatarRequest struct {
-	ID         int                   `json:"id" form:"id"`
-	Avatar     *multipart.FileHeader `json:"-" form:"avatar"`
-	AvatarLink *string               `json:"-" form:"-"`
-}
-
-type GetMeResponse struct {
-	ID       int     `json:"id"`
-	Login    *string `json:"login"`
-	Avatar   *string `json:"avatar"`
-	FullName *string `json:"full_name"`
-	Phone    *string `json:"phone"`
-}

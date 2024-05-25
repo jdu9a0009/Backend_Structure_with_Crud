@@ -12,6 +12,4 @@ type User interface {
 	UpdateAll(ctx context.Context, request user.UpdateRequest) error
 	UpdateColumns(ctx context.Context, request user.UpdateRequest) error
 	Delete(ctx context.Context, id int) error
-	UploadAvatar(ctx context.Context, request user.UploadAvatarRequest) error
-	GetMe(ctx context.Context) (user.GetMeResponse, error)
 }

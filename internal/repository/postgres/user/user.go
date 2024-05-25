@@ -48,63 +48,6 @@ func (r Repository) GetById(ctx context.Context, id int) (entity.User, error) {
 	return detail, err
 }
 
-func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return CreateResponse{}, err
-	}
-
-	if err := r.ValidateStruct(&request, "Login", "Password", "Role"); err != nil {
-		return CreateResponse{}, err
-	}
-	rand.Seed(time.Now().UnixNano())
-
-	loginStatus := true
-	if err := r.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT 
-    						CASE WHEN 
-    						(SELECT id FROM users WHERE login = '%s' AND deleted_at IS NULL) IS NOT NULL 
-    						THEN true ELSE false END`, *request.Login)).Scan(&loginStatus); err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "login check"), http.StatusInternalServerError)
-	}
-	if loginStatus {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "login is used"), http.StatusInternalServerError)
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
-	}
-	hashedPassword := string(hash)
-
-	var response CreateResponse
-	role := strings.ToUpper(*request.Role)
-	if (role != "ADMIN") && (role != "EMPLOYEE") {
-		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be ADMIN or EMPLOYEE"), http.StatusBadRequest)
-	}
-
-	response.Role = &role
-	response.FullName = request.FullName
-	response.Login = request.Login
-	response.Avatar = request.AvatarLink
-	response.Password = &hashedPassword
-	response.Phone = request.Phone
-	response.CreatedAt = time.Now()
-	response.CreatedBy = claims.UserId
-
-	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
-	}
-
-	if response.Avatar != nil {
-		link := r.ServerBaseUrl + hashing.GenerateHash(*response.Avatar)
-		response.Avatar = &link
-	}
-
-	return response, nil
-}
-
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -260,6 +203,63 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	return detail, nil
 }
 
+func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+
+	if err := r.ValidateStruct(&request, "Login", "Password", "Role"); err != nil {
+		return CreateResponse{}, err
+	}
+	rand.Seed(time.Now().UnixNano())
+
+	loginStatus := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT 
+    						CASE WHEN 
+    						(SELECT id FROM users WHERE login = '%s' AND deleted_at IS NULL) IS NOT NULL 
+    						THEN true ELSE false END`, *request.Login)).Scan(&loginStatus); err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "login check"), http.StatusInternalServerError)
+	}
+	if loginStatus {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "login is used"), http.StatusInternalServerError)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+	}
+	hashedPassword := string(hash)
+
+	var response CreateResponse
+	role := strings.ToUpper(*request.Role)
+	if (role != "ADMIN") && (role != "EMPLOYEE") {
+		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be ADMIN or EMPLOYEE"), http.StatusBadRequest)
+	}
+
+	response.Role = &role
+	response.FullName = request.FullName
+	response.Login = request.Login
+	response.Avatar = request.AvatarLink
+	response.Password = &hashedPassword
+	response.Phone = request.Phone
+	response.CreatedAt = time.Now()
+	response.CreatedBy = claims.UserId
+
+	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
+	}
+
+	if response.Avatar != nil {
+		link := r.ServerBaseUrl + hashing.GenerateHash(*response.Avatar)
+		response.Avatar = &link
+	}
+
+	return response, nil
+}
+
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -351,7 +351,6 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		if (role != "ADMIN") && (role != "EMPLOYEE") {
 			return web.NewRequestError(errors.New("incorrect role. role should be ADMIN or EMPLOYEE"), http.StatusBadRequest)
 		}
-
 		q.Set("role = ?", role)
 	}
 
@@ -368,67 +367,4 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
-}
-
-func (r Repository) UploadAvatar(ctx context.Context, request UploadAvatarRequest) error {
-	_, err := r.CheckClaims(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.NewUpdate().
-		Table("users").
-		Set("avatar = ?", request.AvatarLink).
-		Where("deleted_at IS NULL AND id = ?", request.ID).
-		Exec(ctx)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "updating avatar"), http.StatusBadRequest)
-	}
-
-	return nil
-}
-
-func (r Repository) GetMe(ctx context.Context) (GetMeResponse, error) {
-	claims, err := r.CheckClaims(ctx)
-	if err != nil {
-		return GetMeResponse{}, err
-	}
-
-	query := fmt.Sprintf(`
-	SELECT
-	    		users.id,
-	    		users.avatar,
-	    		users.full_name,
-	    		users.phone,
-	    		users.login
-	FROM
-	    users
-	WHERE
-	    users.deleted_at IS NULL AND
-	    users.id = %d
-	`, claims.UserId)
-
-	var detail GetMeResponse
-
-	err = r.QueryRowContext(ctx, query).Scan(
-		&detail.ID,
-		&detail.Avatar,
-		&detail.FullName,
-		&detail.Phone,
-		&detail.Login,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return GetMeResponse{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-	}
-	if err != nil {
-		return GetMeResponse{}, web.NewRequestError(errors.Wrap(err, "selecting user detail"), http.StatusBadRequest)
-	}
-
-	if detail.Avatar != nil {
-		link := r.ServerBaseUrl + hashing.GenerateHash(*detail.Avatar)
-		detail.Avatar = &link
-	}
-
-	return detail, nil
 }

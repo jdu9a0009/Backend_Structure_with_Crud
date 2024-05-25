@@ -86,7 +86,7 @@ func (uc Controller) CreateUser(c *web.Context) error {
 		}
 		fileUrl, _, _, err := commands.Upload(c.Ctx, request.Avatar, "users/avatar", commands.AvatarSize)
 		if err != nil {
-			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload file"), http.StatusBadRequest))
+			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload avatar"), http.StatusBadRequest))
 		}
 		request.AvatarLink = &fileUrl
 	}
@@ -121,7 +121,7 @@ func (uc Controller) UpdateUserAll(c *web.Context) error {
 		}
 		fileUrl, _, _, err := commands.Upload(c.Ctx, request.Avatar, "users/avatar", commands.AvatarSize)
 		if err != nil {
-			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload file"), http.StatusBadRequest))
+			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload avatar"), http.StatusBadRequest))
 		}
 		request.AvatarLink = &fileUrl
 	}
@@ -158,7 +158,7 @@ func (uc Controller) UpdateUserColumns(c *web.Context) error {
 		}
 		fileUrl, _, _, err := commands.Upload(c.Ctx, request.Avatar, "users/avatar", commands.AvatarSize)
 		if err != nil {
-			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload file"), http.StatusBadRequest))
+			return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload avatar"), http.StatusBadRequest))
 		}
 		request.AvatarLink = &fileUrl
 	}
@@ -190,59 +190,6 @@ func (uc Controller) DeleteUser(c *web.Context) error {
 
 	return c.Respond(map[string]interface{}{
 		"data":   "ok!",
-		"status": true,
-	}, http.StatusOK)
-}
-
-func (uc Controller) UploadUserAvatar(c *web.Context) error {
-	id := c.GetParam(reflect.Int, "id").(int)
-
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-
-	var request user.UploadAvatarRequest
-
-	if err := c.BindFunc(&request); err != nil {
-		return c.RespondError(err)
-	}
-
-	if request.Avatar == nil {
-		return c.RespondError(web.NewRequestError(errors.New("avatar is required"), http.StatusBadRequest))
-	}
-
-	request.ID = id
-
-	avatarLink, _, _, err := commands.Upload(c.Ctx, request.Avatar, "users/avatar", commands.AvatarSize)
-	if err != nil {
-		return c.RespondError(web.NewRequestError(errors.Wrap(err, "upload file"), http.StatusBadRequest))
-	}
-
-	request.AvatarLink = &avatarLink
-
-	err = uc.user.UploadAvatar(c.Ctx, request)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data":   "ok!",
-		"status": true,
-	}, http.StatusOK)
-}
-
-func (uc Controller) GetMe(c *web.Context) error {
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-
-	response, err := uc.user.GetMe(c.Ctx)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data":   response,
 		"status": true,
 	}, http.StatusOK)
 }
